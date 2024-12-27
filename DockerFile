@@ -1,17 +1,20 @@
-FROM node:10-alpine
+# Étape 1 : Utiliser une image de base officielle Node.js
+FROM node:16-alpine
 
-RUN mkdir -p /home/node/app/node_modules && chown -R node:node /home/node/app
+# Étape 2 : Définir le répertoire de travail
+WORKDIR /app
 
-WORKDIR /home/node/app
-
+# Étape 3 : Copier les fichiers package.json et package-lock.json
 COPY package*.json ./
 
-USER node
-
+# Étape 4 : Installer les dépendances
 RUN npm install
 
-COPY --chown=node:node . .
+# Étape 5 : Copier le reste des fichiers de l'application
+COPY . .
 
-EXPOSE 8080
+# Étape 6 : Exposer le port utilisé par l'application
+EXPOSE 3000
 
-CMD [ "node", "index.js" ]
+# Étape 7 : Définir la commande de démarrage
+CMD ["npm", "start"]
