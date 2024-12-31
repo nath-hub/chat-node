@@ -34,7 +34,7 @@ io.on('connection', (socket) => {
 
     // Gérer l'envoi de messages
     socket.on('send_message', (data) => {
-        const { sender_id, receiver_id, message } = data;
+        const { sender_id, receiver_id, message, piece_jointe } = data;
 
         // Vérifier si le receiver_id est connecté
         const receiverSocketId = users[receiver_id];
@@ -44,6 +44,7 @@ io.on('connection', (socket) => {
                 sender_id: sender_id,
                 receiver_id: receiver_id,
                 message: message,
+                piece_jointe: piece_jointe,
                 timestamp: new Date().toLocaleTimeString()
             });
             console.log(`Message de ${sender_id} à ${receiver_id}: ${message}`);
@@ -67,7 +68,7 @@ io.on('connection', (socket) => {
 // Endpoint pour envoyer un message via fetch
  
 app.post('/send-message', async (req, res) => {
-    const { sender_id, receiver_id, message } = req.body; 
+    const { sender_id, receiver_id, message, piece_jointe } = req.body; 
  
     const authHeader = req.headers['authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -87,6 +88,7 @@ app.post('/send-message', async (req, res) => {
                 sender_id: sender_id,
                 receiver_id: receiver_id,
                 message: message,
+                piece_jointe: piece_jointe,
             }),
         });
 
@@ -103,7 +105,8 @@ app.post('/send-message', async (req, res) => {
              io.to(receiverSocketId).emit('send_message', { 
                  sender_id, 
                  receiver_id, 
-                 message 
+                 message,
+                 piece_jointe,
              });
              console.log(`Message envoyé de ${sender_id} à ${receiver_id} via Socket.IO.`);
          } else {
