@@ -3,6 +3,8 @@ const http = require('http');
 const socketIo = require('socket.io');
 const bodyParser = require('body-parser'); 
 const cors = require('cors');
+// const fetch = require('node-fetch');
+// import fetch from 'node-fetch';
 
 // Initialisation du serveur Express et du serveur HTTP
 const app = express();
@@ -74,6 +76,8 @@ app.post('/send-message', async (req, res) => {
     const token = authHeader.split(' ')[1];
 
     try {
+        const fetch = (await import('node-fetch')).default;
+        
         const response = await fetch("https://damam.zeta-messenger.com/api/messages", {
             method: "POST",
             headers: {
