@@ -4,6 +4,7 @@ const socketIo = require('socket.io');
 const bodyParser = require('body-parser'); 
 const cors = require('cors');
 const FormData = require('form-data');
+const multer = require('multer');
 
 const fetch = require('node-fetch');
 
@@ -18,6 +19,9 @@ const io = socketIo(server, {
 });
 
 app.use(bodyParser.json());
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 app.use(cors());
 
@@ -68,9 +72,10 @@ io.on('connection', (socket) => {
 
 // Endpoint pour envoyer un message via fetch
  
-app.post('/send-message', async (req, res) => {
-    const { sender_id, receiver_id, message, piece_jointe } = req.body; 
- 
+app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
+    const { sender_id, receiver_id, message } = req.body;
+
+    // Vérification du token
     const authHeader = req.headers['authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ message: 'Token non fourni ou invalide.' });
@@ -81,57 +86,53 @@ app.post('/send-message', async (req, res) => {
         const formData = new FormData();
 
         // Ajouter les champs de texte
-        formData.append('sender_id', req.body.sender_id);
-        formData.append('receiver_id', req.body.receiver_id);
-        formData.append('message', req.body.message);
+        formData.append('sender_id', sender_id);
+        formData.append('receiver_id', receiver_id);
+        formData.append('message', message);
 
         // Ajouter la pièce jointe si elle existe
         if (req.file) {
-            formData.append('piece_jointe', req.file.buffer, req.file.originalname);
+            formData.append('piece_jointe', req.file.buffer, req.file.originalname || 'piece_jointe');
         }
 
+        // Requête fetch vers l'API externe
         const response = await fetch("https://damam.zeta-messenger.com/api/messages", {
             method: "POST",
             headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`, // Pas de Content-Type car géré par form-data
             },
             body: formData,
         });
 
         if (!response.ok) {
             console.log(response);
-            throw new Error('Erreur lors de l\'envoi à l\'API externe', response);
+            throw new Error('Erreur lors de l\'envoi à l\'API externe');
         }
 
         const data = await response.json();
-  
-         // Vérifier si le receiver est connecté via Socket.IO
-         const receiverSocketId = users[receiver_id];
-         if (receiverSocketId) {
-             io.to(receiverSocketId).emit('send_message', { 
-                sender_id: req.body.sender_id,
-                receiver_id: req.body.receiver_id,
-                message: req.body.message,
+
+        // Vérifier si le receiver est connecté via Socket.IO
+        const receiverSocketId = users[receiver_id];
+        if (receiverSocketId) {
+            io.to(receiverSocketId).emit('receive_message', {
+                sender_id,
+                receiver_id,
+                message,
                 piece_jointe: req.file ? req.file.originalname : null,
-             });
-             console.log(`Message envoyé de ${sender_id} à ${receiver_id} via Socket.IO.`);
-         } else {
-             console.log(`Utilisateur ${receiver_id} non connecté.`);
-         }
+            });
+        }
 
         res.status(200).json({
-            data: data,
-            message: 'Message envoyé via fetch avec succès !',
-        })
+            data,
+            message: 'Message envoyé avec succès !',
+        });
 
     } catch (error) {
         console.error("Erreur lors de la requête fetch:", error);
         res.status(500).json({ message: 'Erreur lors de l\'envoi du message', error });
     }
-
 });
+
 
 
 // Démarrer le serveur
