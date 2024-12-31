@@ -77,7 +77,7 @@ app.post('/send-message', async (req, res) => {
     const token = authHeader.split(' ')[1];
 
     try {
-        const response = await fetch("http://127.0.0.1:8000/api/messages", {
+        const response = await fetch("https://damam.zeta-messenger.com/api/messages", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
