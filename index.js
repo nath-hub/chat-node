@@ -1,7 +1,8 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const bodyParser = require('body-parser');
+const bodyParser = require('body-parser'); 
+const cors = require('cors');
 
 // Initialisation du serveur Express et du serveur HTTP
 const app = express();
@@ -12,14 +13,13 @@ const io = socketIo(server, {
         methods: ["GET", "POST"]
     }
 });
-const cors = require('cors');
 
 app.use(bodyParser.json());
 
 app.use(cors());
 
-let users = {};
-let messages = [];
+let users = {}; // Associe `user_id` à `socket.id`
+let messages = []; // Stocke temporairement les messages (optionnel)
 
 io.on('connection', (socket) => {
     console.log('Un utilisateur est connecté avec socket ID:', socket.id);
@@ -40,6 +40,7 @@ io.on('connection', (socket) => {
             // Envoyer le message au destinataire spécifique
             io.to(receiverSocketId).emit('receive_message', {
                 sender_id: sender_id,
+                receiver_id: receiver_id,
                 message: message,
                 timestamp: new Date().toLocaleTimeString()
             });
@@ -66,8 +67,14 @@ io.on('connection', (socket) => {
 
 
 app.post('/send-message', async (req, res) => {
-    const { sender_id, receiver_id, message } = req.body;
-    const token = '6|BPz0prnY0iNrnVdkVxN9QwHfjRF7EKNe91LJFbP583f71eaf';
+    const { sender_id, receiver_id, message } = req.body; 
+
+     // Récupérer le jeton de l'en-tête Authorization
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Token non fourni ou invalide.' });
+    }
+    const token = authHeader.split(' ')[1];
 
     try {
         const response = await fetch("http://127.0.0.1:8000/api/messages", {
@@ -81,21 +88,31 @@ app.post('/send-message', async (req, res) => {
                 sender_id: sender_id,
                 receiver_id: receiver_id,
                 message: message,
-
             }),
         });
 
         if (!response.ok) {
             console.log(response);
-            throw new Error('Erreur lors de l\'envoi à l\'API externe');
+            throw new Error('Erreur lors de l\'envoi à l\'API externe', response);
         }
 
         const data = await response.json();
 
         // Vérifier si le receiver est connecté via Socket.IO
-        io.emit('send_message', { sender_id, receiver_id, message });
-
-        console.log('Message envoyé via Socket.IO');
+        // io.emit('send_message', { sender_id, receiver_id, message });
+  
+         // Vérifier si le receiver est connecté via Socket.IO
+         const receiverSocketId = users[receiver_id];
+         if (receiverSocketId) {
+             io.to(receiverSocketId).emit('send_message', { 
+                 sender_id, 
+                 receiver_id, 
+                 message 
+             });
+             console.log(`Message envoyé de ${sender_id} à ${receiver_id} via Socket.IO.`);
+         } else {
+             console.log(`Utilisateur ${receiver_id} non connecté.`);
+         }
 
         res.status(200).json({
             data: data,
@@ -104,12 +121,10 @@ app.post('/send-message', async (req, res) => {
 
     } catch (error) {
         console.error("Erreur lors de la requête fetch:", error);
-        res.status(500).json({ message: 'Erreur lors de l\'envoi du message' });
+        res.status(500).json({ message: 'Erreur lors de l\'envoi du message', error });
     }
- 
+
 });
-
-
 
 
 // Démarrer le serveur
