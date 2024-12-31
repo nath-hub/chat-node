@@ -63,13 +63,10 @@ io.on('connection', (socket) => {
 });
 
 // Endpoint pour envoyer un message via fetch
-
-
-
+ 
 app.post('/send-message', async (req, res) => {
     const { sender_id, receiver_id, message } = req.body; 
-
-     // Récupérer le jeton de l'en-tête Authorization
+ 
     const authHeader = req.headers['authorization'];
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ message: 'Token non fourni ou invalide.' });
@@ -97,9 +94,6 @@ app.post('/send-message', async (req, res) => {
         }
 
         const data = await response.json();
-
-        // Vérifier si le receiver est connecté via Socket.IO
-        // io.emit('send_message', { sender_id, receiver_id, message });
   
          // Vérifier si le receiver est connecté via Socket.IO
          const receiverSocketId = users[receiver_id];
