@@ -77,6 +77,18 @@ app.post('/send-message', async (req, res) => {
     const token = authHeader.split(' ')[1];
 
     try {
+        const formData = new FormData();
+
+        // Ajouter les champs de texte
+        formData.append('sender_id', req.body.sender_id);
+        formData.append('receiver_id', req.body.receiver_id);
+        formData.append('message', req.body.message);
+
+        // Ajouter la pièce jointe si elle existe
+        if (req.file) {
+            formData.append('piece_jointe', req.file.buffer, req.file.originalname);
+        }
+
         const response = await fetch("https://damam.zeta-messenger.com/api/messages", {
             method: "POST",
             headers: {
@@ -84,12 +96,7 @@ app.post('/send-message', async (req, res) => {
                 "Accept": "application/json",
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({
-                sender_id: sender_id,
-                receiver_id: receiver_id,
-                message: message,
-                piece_jointe: piece_jointe,
-            }),
+            body: formData,
         });
 
         if (!response.ok) {
@@ -103,10 +110,10 @@ app.post('/send-message', async (req, res) => {
          const receiverSocketId = users[receiver_id];
          if (receiverSocketId) {
              io.to(receiverSocketId).emit('send_message', { 
-                 sender_id, 
-                 receiver_id, 
-                 message,
-                 piece_jointe,
+                sender_id: req.body.sender_id,
+                receiver_id: req.body.receiver_id,
+                message: req.body.message,
+                piece_jointe: req.file ? req.file.originalname : null,
              });
              console.log(`Message envoyé de ${sender_id} à ${receiver_id} via Socket.IO.`);
          } else {
