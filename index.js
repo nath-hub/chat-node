@@ -105,10 +105,8 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
         });
 
         const rawResponse = await response.text(); // Lire le texte brut de la réponse
-        
-        const dataParse = JSON.parse(rawResponse)
-        console.log("Réponse brute:", dataParse);
-
+        console.log("Réponse bruteeeeeeeeeeeeeeeeeeeeeeeeeee:");
+       
         if (!response.ok) { 
             console.error("Erreur HTTP:", response.status, response.statusText);
             const errorText = await response.text();
