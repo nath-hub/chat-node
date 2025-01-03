@@ -123,8 +123,8 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
         try {
             console.log("ca arrive iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii:");
 
-            data = await response.text(); // Parser le texte brut en JSON si possible
-            console.log("Données JSON reçues:", data);
+            // data = await response.text(); // Parser le texte brut en JSON si possible
+            console.log("Données JSON reçues:", rawResponse);
         } catch (parseError) {
             console.error("Erreur lors du parsing JSON:", parseError);
             return res.status(500).json({
