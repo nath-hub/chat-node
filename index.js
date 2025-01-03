@@ -106,7 +106,11 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
 
         if (!response.ok) {
             console.log(response);
-            throw new Error('Erreur lors de l\'envoi à l\'API externe');
+
+            res.status(400).json({ 
+                message: 'Erreur lors de l\'envoi à l\'API externe !',
+            });
+            // throw new Error('Erreur lors de l\'envoi à l\'API externe');
         }
 
         const data = await response.json();
