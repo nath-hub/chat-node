@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
-const bodyParser = require('body-parser'); 
+const bodyParser = require('body-parser');
 const cors = require('cors');
 const FormData = require('form-data');
 const multer = require('multer');
@@ -71,7 +71,7 @@ io.on('connection', (socket) => {
 });
 
 // Endpoint pour envoyer un message via fetch
- 
+
 app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
     const { sender_id, receiver_id, message } = req.body;
 
@@ -106,28 +106,28 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
 
         const rawResponse = await response.text(); // Lire le texte brut de la réponse
         console.log("Réponse bruteeeeeeeeeeeeeeeeeeeeeeeeeee:");
-       
-        if (!response.ok) { 
+
+        if (!response.ok) {
             console.error("Erreur HTTP:", response.status, response.statusText);
             const errorText = await response.text();
             console.error("Détails de l'erreur:", errorText);
 
-            res.status(400).json({ 
+            res.status(400).json({
                 message: 'Erreur lors de l\'envoi à l\'API externe !',
                 details: rawResponse,
             });
             // throw new Error('Erreur lors de l\'envoi à l\'API externe');
         }
-
-        // const data = await response.json();
-
+ 
         let data;
         try {
-            data = JSON.parse(rawResponse); // Parser le texte brut en JSON si possible
+            console.log("ca arrive iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii:");
+
+            data = await response.text(); // Parser le texte brut en JSON si possible
             console.log("Données JSON reçues:", data);
         } catch (parseError) {
             console.error("Erreur lors du parsing JSON:", parseError);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 message: 'Erreur de réponse JSON de l\'API externe.',
                 details: rawResponse,
             });
@@ -152,7 +152,7 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
             message: 'Message envoyé avec succès !',
         });
 
-    } catch (error) { 
+    } catch (error) {
         console.error("Erreur lors de la requête fetch:", error);
         res.status(500).json({ message: 'Erreur lors de l\'envoi du message', error });
     }
