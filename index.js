@@ -104,6 +104,9 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
             body: formData,
         });
 
+        const rawResponse = await response.text(); // Lire le texte brut de la réponse
+        console.log("Réponse brute:", rawResponse);
+
         if (!response.ok) { 
             console.error("Erreur HTTP:", response.status, response.statusText);
             const errorText = await response.text();
@@ -111,6 +114,7 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
 
             res.status(400).json({ 
                 message: 'Erreur lors de l\'envoi à l\'API externe !',
+                details: rawResponse,
             });
             // throw new Error('Erreur lors de l\'envoi à l\'API externe');
         }
@@ -119,12 +123,13 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
 
         let data;
         try {
-            data = await response.json();
+            data = JSON.parse(rawResponse); // Parser le texte brut en JSON si possible
             console.log("Données JSON reçues:", data);
-        } catch (error) {
-            console.error("Erreur lors du parsing JSON:", error);
+        } catch (parseError) {
+            console.error("Erreur lors du parsing JSON:", parseError);
             return res.status(500).json({ 
-                message: 'Erreur de réponse JSON de l\'API externe.' 
+                message: 'Erreur de réponse JSON de l\'API externe.',
+                details: rawResponse,
             });
         }
 
@@ -149,7 +154,7 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
 
     } catch (error) { 
         console.error("Erreur lors de la requête fetch:", error);
-        res.status(500).json({ message: 'Erreur lors de l\'envoi du message', data : null, error });
+        res.status(500).json({ message: 'Erreur lors de l\'envoi du message', error });
     }
 });
 
