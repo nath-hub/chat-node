@@ -148,7 +148,7 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
         console.log("Réponse brute:", await response.text());
 
         res.status(200).json({
-            data,
+            "data": data,
             message: 'Message envoyé avec succès !',
         });
 
