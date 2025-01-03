@@ -104,8 +104,10 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
             body: formData,
         });
 
-        if (!response.ok) {
-            console.log(response);
+        if (!response.ok) { 
+            console.error("Erreur HTTP:", response.status, response.statusText);
+            const errorText = await response.text();
+            console.error("Détails de l'erreur:", errorText);
 
             res.status(400).json({ 
                 message: 'Erreur lors de l\'envoi à l\'API externe !',
@@ -113,7 +115,18 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
             // throw new Error('Erreur lors de l\'envoi à l\'API externe');
         }
 
-        const data = await response.json();
+        // const data = await response.json();
+
+        let data;
+        try {
+            data = await response.json();
+            console.log("Données JSON reçues:", data);
+        } catch (error) {
+            console.error("Erreur lors du parsing JSON:", error);
+            return res.status(500).json({ 
+                message: 'Erreur de réponse JSON de l\'API externe.' 
+            });
+        }
 
         // Vérifier si le receiver est connecté via Socket.IO
         const receiverSocketId = users[receiver_id];
@@ -126,14 +139,17 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
             });
         }
 
+        console.log("Statut de la réponse:", response.status);
+        console.log("Réponse brute:", await response.text());
+
         res.status(200).json({
             data,
             message: 'Message envoyé avec succès !',
         });
 
-    } catch (error) {
+    } catch (error) { 
         console.error("Erreur lors de la requête fetch:", error);
-        res.status(500).json({ message: 'Erreur lors de l\'envoi du message', error });
+        res.status(500).json({ message: 'Erreur lors de l\'envoi du message', data : null, error });
     }
 });
 
