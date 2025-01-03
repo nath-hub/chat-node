@@ -105,24 +105,17 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
         });
 
         const rawResponse = await response.text(); // Lire le texte brut de la réponse
-        console.log("Réponse bruteeeeeeeeeeeeeeeeeeeeeeeeeee:");
-
+        
         if (!response.ok) {
-            console.error("Erreur HTTP:", response.status, response.statusText);
-            const errorText = await response.text();
-            console.error("Détails de l'erreur:", errorText);
-
+            
             res.status(400).json({
                 message: 'Erreur lors de l\'envoi à l\'API externe !',
                 details: rawResponse,
             });
-            // throw new Error('Erreur lors de l\'envoi à l\'API externe');
-        }
+            }
  
         let data;
         try {
-            console.log("ca arrive iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii:");
-
             // data = await response.text(); // Parser le texte brut en JSON si possible
             console.log("Données JSON reçues:", rawResponse);
         } catch (parseError) {
@@ -143,10 +136,7 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
                 piece_jointe: req.file ? req.file.originalname : null,
             });
         }
-
-        console.log("Statut de la réponse:", response.status);
-        console.log("Réponse brute:", rawResponse);
-
+ 
         res.status(200).json({
             "data": data,
             message: 'Message envoyé avec succès !',
