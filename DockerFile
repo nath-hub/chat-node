@@ -10,11 +10,14 @@ COPY package*.json ./
 # Étape 4 : Installer les dépendances
 RUN npm install
 
-# Étape 5 : Copier le reste des fichiers de l'application
+# Étape 5 : Installer nodemon globalement
+RUN npm install -g nodemon
+
+# Étape 6 : Copier le reste des fichiers de l'application
 COPY . .
 
-# Étape 6 : Exposer le port utilisé par l'application
+# Étape 7 : Exposer le port utilisé par l'application
 EXPOSE 3000
 
-# Étape 7 : Définir la commande de démarrage
-CMD ["npm", "start"]
+# Étape 8 : Définir la commande de démarrage pour utiliser nodemon
+CMD ["nodemon", "index.js"]  # Remplacez 'index.js' par le fichier de démarrage de votre application
