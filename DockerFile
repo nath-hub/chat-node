@@ -20,4 +20,4 @@ COPY . .
 EXPOSE 3000
 
 # Étape 8 : Définir la commande de démarrage pour utiliser nodemon
-CMD ["nodemon", "index.js"]  # Remplacez 'index.js' par le fichier de démarrage de votre application
+CMD ["nodemon", "app.js"]   
