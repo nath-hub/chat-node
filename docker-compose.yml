@@ -11,4 +11,5 @@ services:
       - .:/app # Monte le répertoire actuel dans le conteneur pour le développement
       - /app/node_modules # Exclut les node_modules pour éviter les conflits
     environment:
-      NODE_ENV: development # Ajoute des variables d'environnement si nécessaire
+      NODE_ENV: development # Ajoute des variables d'environnement si nécessaire
+    command: ["npx", "nodemon", "app.js"]
