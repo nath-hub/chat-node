@@ -105,15 +105,15 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
         });
 
         const rawResponse = await response.text(); // Lire le texte brut de la réponse
-        
+
         if (!response.ok) {
-            
+
             res.status(400).json({
                 message: 'Erreur lors de l\'envoi à l\'API externe !',
                 details: rawResponse,
             });
-            }
- 
+        }
+
         let data;
         try {
             // data = await response.text(); // Parser le texte brut en JSON si possible
@@ -136,7 +136,7 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
                 piece_jointe: req.file ? req.file.originalname : null,
             });
         }
- 
+
         res.status(200).json({
             "data": data,
             message: 'Message envoyé avec succès !',
@@ -145,6 +145,81 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
     } catch (error) {
         console.error("Erreur lors de la requête fetch:", error);
         res.status(500).json({ message: 'Erreur lors de l\'envoi du message', error });
+    }
+});
+
+
+
+app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, res) => {
+    const { sender_id, message } = req.body;
+
+    // Vérification du token
+    const authHeader = req.headers['authorization'];
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Token non fourni ou invalide.' });
+    }
+    const token = authHeader.split(' ')[1];
+
+    try {
+
+        const adminResponse = await fetch('ttps://damam.zeta-messenger.com/api/sendMessageToSupport', {
+            method: "GET",
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!adminResponse.ok) {
+            const errorText = await adminResponse.text();
+            return res.status(adminResponse.status).json({
+                message: 'Erreur lors de la récupération des administrateurs.',
+                details: errorText,
+            });
+        }
+
+        const admins = await adminResponse.json(); // La réponse est directement un tableau
+        const adminIds = admins.map(admin => admin.id); // Itérer directement sur le tableau
+
+        if (!adminIds.length) {
+            return res.status(400).json({ message: 'Aucun administrateur trouvé.' });
+        }
+
+        for (const adminId of adminIds) {
+            const formData = new FormData();
+
+            // Ajouter les champs de texte
+            formData.append('sender_id', req.body.sender_id || 'admin');
+            formData.append('receiver_id', adminId);
+            formData.append('message', message);
+
+            // Ajouter la pièce jointe si elle existe
+            if (req.file) {
+                formData.append('piece_jointe', req.file.buffer, req.file.originalname || 'piece_jointe');
+            }
+
+            // Envoi du message à chaque admin
+            const response = await fetch('ttps://damam.zeta-messenger.com/api/messages', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            const rawResponse = await response.text();
+
+            if (!response.ok) {
+                console.error(`Erreur lors de l'envoi à l'admin ${adminId}:`, rawResponse);
+            } else {
+                console.log(`Message envoyé avec succès à l'admin ${adminId}`);
+            }
+        }
+
+        res.status(200).json({ message: 'Messages envoyés aux administrateurs avec succès.' });
+
+    } catch (error) {
+        console.error('Erreur lors de la requête fetch:', error);
+        res.status(500).json({ message: 'Erreur lors de l\'envoi des messages', error });
     }
 });
 
