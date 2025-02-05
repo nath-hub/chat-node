@@ -162,11 +162,8 @@ app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, r
 
     try {
 
-        const adminResponse = await fetch('ttps://damam.zeta-messenger.com/api/sendMessageToSupport', {
+        const adminResponse = await fetch('https://damam.zeta-messenger.com/api/sendMessageToSupport', {
             method: "GET",
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
         });
 
         if (!adminResponse.ok) {
@@ -198,7 +195,7 @@ app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, r
             }
 
             // Envoi du message à chaque admin
-            const response = await fetch('ttps://damam.zeta-messenger.com/api/messages', {
+            const response = await fetch('https://damam.zeta-messenger.com/api/messages', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
