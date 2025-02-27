@@ -185,9 +185,9 @@ app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, r
             const rawResponse = await response.text();
 
             if (!response.ok) {
-                console.error(`Erreur lors de l'envoi à l'admin ${adminId}:`, rawResponse);
+                console.error(`Erreur lors de l'envoi à l'admin :`, rawResponse);
             } else {
-                console.log(`Message envoyé avec succès à l'admin ${adminId}`);
+                console.log(`Message envoyé avec succès à l'admin`);
             }
         
 
