@@ -161,32 +161,11 @@ app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, r
     const token = authHeader.split(' ')[1];
 
     try {
-
-        const adminResponse = await fetch('https://damam.zeta-messenger.com/api/sendMessageToSupport', {
-            method: "GET",
-        });
-
-        if (!adminResponse.ok) {
-            const errorText = await adminResponse.text();
-            return res.status(adminResponse.status).json({
-                message: 'Erreur lors de la récupération des administrateurs.',
-                details: errorText,
-            });
-        }
-
-        const admins = await adminResponse.json(); // La réponse est directement un tableau
-        const adminIds = admins.map(admin => admin.id); // Itérer directement sur le tableau
-
-        if (!adminIds.length) {
-            return res.status(400).json({ message: 'Aucun administrateur trouvé.' });
-        }
-
-        for (const adminId of adminIds) {
+ 
             const formData = new FormData();
 
             // Ajouter les champs de texte
-            formData.append('sender_id', req.body.sender_id || 'admin');
-            formData.append('receiver_id', adminId);
+            formData.append('sender_id', req.body.sender_id || 'admin'); 
             formData.append('message', message);
 
             // Ajouter la pièce jointe si elle existe
@@ -210,7 +189,7 @@ app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, r
             } else {
                 console.log(`Message envoyé avec succès à l'admin ${adminId}`);
             }
-        }
+        
 
         res.status(200).json({ message: 'Messages envoyés aux administrateurs avec succès.' });
 
