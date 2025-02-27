@@ -73,7 +73,7 @@ io.on('connection', (socket) => {
 // Endpoint pour envoyer un message via fetch
 
 app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
-    const { sender_id, receiver_id, message } = req.body;
+    const { sender_id, receiver_id, message, type } = req.body;
 
     // Vérification du token
     const authHeader = req.headers['authorization'];
@@ -89,6 +89,7 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
         formData.append('sender_id', sender_id);
         formData.append('receiver_id', receiver_id);
         formData.append('message', message);
+        formData.append('type', type);
 
         // Ajouter la pièce jointe si elle existe
         if (req.file) {
@@ -133,6 +134,7 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
                 sender_id,
                 receiver_id,
                 message,
+                type,
                 piece_jointe: req.file ? req.file.originalname : null,
             });
         }
@@ -167,6 +169,7 @@ app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, r
             // Ajouter les champs de texte
             formData.append('sender_id', req.body.sender_id || 'admin'); 
             formData.append('message', message);
+            formData.append('type', "SUPPORT");
 
             // Ajouter la pièce jointe si elle existe
             if (req.file) {
