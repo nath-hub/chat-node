@@ -97,7 +97,7 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
         }
 
         // Requête fetch vers l'API externe
-        const response = await fetch("https://damam.zeta-messenger.com/api/messages", {
+        const response = await fetch("http://damam.zeta-messenger.com/api/messages", {
             method: "POST",
             headers: {
                 'Authorization': `Bearer ${token}`, // Pas de Content-Type car géré par form-data
@@ -197,7 +197,7 @@ app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, r
             }
 
             // Envoi du message à chaque admin
-            const response = await fetch('https://damam.zeta-messenger.com/api/send_messages_to_support', {
+            const response = await fetch('http://damam.zeta-messenger.com/api/send_messages_to_support', {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
