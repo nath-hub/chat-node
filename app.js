@@ -166,7 +166,7 @@ app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, r
          
             const formData = new FormData();
  
-            formData.append('user_id', req.body.user_id || null);
+            formData.append('user_id', req.body.user_id ?? '');
             // formData.append('receiver_id', adminId);
             formData.append('message', message); 
 
