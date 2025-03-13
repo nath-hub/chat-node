@@ -10,6 +10,7 @@ const fetch = require('node-fetch');
 
 // Initialisation du serveur Express et du serveur HTTP
 const app = express();
+app.use(express.json());
 const server = http.createServer(app);
 const io = socketIo(server, {
     cors: {
@@ -19,6 +20,7 @@ const io = socketIo(server, {
 });
 
 app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: true }));
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
