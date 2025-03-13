@@ -41,8 +41,13 @@ io.on('connection', (socket) => {
 
     // Gérer l'envoi de messages
     socket.on('send_message', (data) => {
+        console.log("Données reçues du client:", data);
         const { sender_id, receiver_id, message, piece_jointe } = data;
 
+        if (typeof message !== "string") {
+            console.error("Message mal formé :", message);
+            return;
+        }
         // Vérifier si le receiver_id est connecté
         const receiverSocketId = users[receiver_id];
         if (receiverSocketId) {
@@ -108,7 +113,8 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
         });
 
         const rawResponse = await response.text(); // Lire le texte brut de la réponse
-
+        console.log("Réponse brute de l'API externe:", rawResponse);
+        
         if (!response.ok) {
 
             res.status(400).json({
