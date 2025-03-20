@@ -35,7 +35,13 @@ io.on('connection', (socket) => {
 
     // Lorsqu'un utilisateur s'enregistre
     socket.on('register_user', (user_id) => {
-        users[user_id] = socket.id; // Associe le user_id au socket.id
+         
+        if (!users[user_id]) {
+            users[user_id] = []; // Initialiser un tableau pour stocker plusieurs sockets
+        }
+
+        users[user_id].push(socket.id);
+
         console.log(`Utilisateur ${user_id} enregistré avec socket ID: ${socket.id}`);
     });
 
@@ -68,14 +74,32 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
         for (let user_id in users) {
-            if (users[user_id] === socket.id) {
-                console.log(`Utilisateur ${user_id} déconnecté.`);
-                delete users[user_id];
-                break;
-            }
+
+            users[user_id] = users[user_id].filter(socketId => socketId !== socket.id);
+
+            if (users[user_id].length === 0) {
+            delete users[user_id]; // Supprimer l'entrée si aucun socket connecté
+        }
+        console.log(`Un utilisateur s'est déconnecté : ${socket.id}`);
         }
     });
 });
+
+
+const getAdminIds = async () => {
+    try {
+        const response = await fetch('http://damam.zeta-messenger.com/api/getAdmin', {
+            method: 'GET',
+            
+        });
+
+        const admins = await response.json();
+        return admins.map(admin => admin.id); // Supposons que l'API retourne une liste d'admins { id: ... }
+    } catch (error) {
+        console.error("Erreur lors de la récupération des admins:", error);
+        return [];
+    }
+};
 
 // Endpoint pour envoyer un message via fetch
 
@@ -172,6 +196,8 @@ app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, r
 
     try {
          
+        const adminIds = await getAdminIds();
+
             const formData = new FormData();
  
             formData.append('user_id', req.body.user_id ?? '');
@@ -199,6 +225,23 @@ app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, r
             } else {
                 console.log(`Message envoyé avec succès à l'admin`);
             } 
+
+            adminIds.forEach(adminId => {
+                if (users[adminId]) { // Vérifier si l'admin est connecté
+                    users[adminId].forEach(socketId => {
+                        io.to(socketId).emit('receive_message', {
+                            sender_id: user_id,
+                            receiver_id: adminId,
+                            message: message,
+                            piece_jointe: req.file ? req.file.originalname : null
+                        });
+
+                        console.log(`Message de `, $sender_id);
+                        console.log(`Message pour`, $receiver_id);
+                        console.log(`Message text `, $message);
+                    });
+                }
+            });
 
         res.status(200).json({ message: 'Messages envoyés aux administrateurs avec succès.' });
 
