@@ -234,11 +234,7 @@ app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, r
                             receiver_id: adminId,
                             message: message,
                             piece_jointe: req.file ? req.file.originalname : null
-                        });
-
-                        console.log(`Message de `, $sender_id);
-                        console.log(`Message pour`, $receiver_id);
-                        console.log(`Message text `, $message);
+                        }); 
                     });
                 }
             });
