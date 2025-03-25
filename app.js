@@ -35,7 +35,7 @@ io.on('connection', (socket) => {
 
     // Lorsqu'un utilisateur s'enregistre
     socket.on('register_user', (user_id) => {
-         
+
         if (!users[user_id]) {
             users[user_id] = []; // Initialiser un tableau pour stocker plusieurs sockets
         }
@@ -78,9 +78,9 @@ io.on('connection', (socket) => {
             users[user_id] = users[user_id].filter(socketId => socketId !== socket.id);
 
             if (users[user_id].length === 0) {
-            delete users[user_id]; // Supprimer l'entrée si aucun socket connecté
-        }
-        console.log(`Un utilisateur s'est déconnecté : ${socket.id}`);
+                delete users[user_id]; // Supprimer l'entrée si aucun socket connecté
+            }
+            console.log(`Un utilisateur s'est déconnecté : ${socket.id}`);
         }
     });
 });
@@ -90,7 +90,7 @@ const getAdminIds = async () => {
     try {
         const response = await fetch('http://damam.zeta-messenger.com/api/getAdmin', {
             method: 'GET',
-            
+
         });
 
         const admins = await response.json();
@@ -120,7 +120,7 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
         formData.append('sender_id', sender_id);
         formData.append('receiver_id', receiver_id);
         formData.append('message', message);
-        formData.append('type', type);
+        // formData.append('type', type);
 
         // Ajouter la pièce jointe si elle existe
         if (req.file) {
@@ -138,7 +138,7 @@ app.post('/send-message', upload.single('piece_jointe'), async (req, res) => {
 
         const rawResponse = await response.text(); // Lire le texte brut de la réponse
         console.log("Réponse brute de l'API externe:", rawResponse);
-        
+
         if (!response.ok) {
 
             res.status(400).json({
@@ -195,49 +195,51 @@ app.post('/send_message_to_admins', upload.single('piece_jointe'), async (req, r
     const token = authHeader.split(' ')[1];
 
     try {
-         
+
         const adminIds = await getAdminIds();
 
-            const formData = new FormData();
- 
-            formData.append('user_id', req.body.user_id ?? '');
-            // formData.append('receiver_id', adminId);
-            formData.append('message', message); 
+        console.log(adminIds);
 
-            // Ajouter la pièce jointe si elle existe
-            if (req.file) {
-                formData.append('piece_jointe', req.file.buffer, req.file.originalname || 'piece_jointe');
-            }
+        const formData = new FormData();
 
-            // Envoi du message à chaque admin
-            const response = await fetch('http://damam.zeta-messenger.com/api/send_messages_to_support', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
-            });
+        formData.append('user_id', req.body.user_id ?? '');
+        // formData.append('receiver_id', adminId);
+        formData.append('message', message);
 
-            const rawResponse = await response.text();
+        // Ajouter la pièce jointe si elle existe
+        if (req.file) {
+            formData.append('piece_jointe', req.file.buffer, req.file.originalname || 'piece_jointe');
+        }
 
-            if (!response.ok) {
-                console.error(`Erreur lors de l'envoi à l'admin`, rawResponse);
-            } else {
-                console.log(`Message envoyé avec succès à l'admin`);
-            } 
+        // Envoi du message à chaque admin
+        const response = await fetch('http://damam.zeta-messenger.com/api/send_messages_to_support', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
 
-            adminIds.forEach(adminId => {
-                if (users[adminId]) { // Vérifier si l'admin est connecté
-                    users[adminId].forEach(socketId => {
-                        io.to(socketId).emit('receive_message', {
-                            sender_id: user_id,
-                            receiver_id: adminId,
-                            message: message,
-                            piece_jointe: req.file ? req.file.originalname : null
-                        }); 
+        const rawResponse = await response.text();
+
+        if (!response.ok) {
+            console.error(`Erreur lors de l'envoi à l'admin`, rawResponse);
+        } else {
+            console.log(`Message envoyé avec succès à l'admin`);
+        }
+
+        adminIds.forEach(adminId => {
+            if (users[adminId]) { // Vérifier si l'admin est connecté
+                users[adminId].forEach(socketId => {
+                    io.to(socketId).emit('receive_message', {
+                        sender_id: user_id,
+                        receiver_id: adminId,
+                        message: message,
+                        piece_jointe: req.file ? req.file.originalname : null
                     });
-                }
-            });
+                });
+            }
+        });
 
         res.status(200).json({ message: 'Messages envoyés aux administrateurs avec succès.' });
 
