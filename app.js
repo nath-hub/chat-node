@@ -273,7 +273,7 @@ app.post(
 const getUser = async (token) => {
   try {
     const response = await fetch(
-      "http://host.docker.internal:8080/api/get_user",
+      "http://damam.zeta-messenger.com/api/get_user",
       {
         method: "GET",
         headers: {
@@ -307,7 +307,7 @@ const saveNewStatus = async (user_id, status) => {
     formData.append("status", status);
 
     const response = await fetch(
-      "http://host.docker.internal:8080/api/save_new_status",
+      "http://damam.zeta-messenger.com/api/save_new_status",
       {
         method: "POST",
         body: formData,
