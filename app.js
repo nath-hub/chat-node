@@ -362,6 +362,8 @@ app.post("/check_payment", async (req, res) => {
 
         const text = await momoResponse.text(); // Lisez la réponse en texte
 
+        //  const interval = setInterval(async () => {
+
         let momoResult;
         if (text && text.trim() !== "") {
           try {
@@ -403,6 +405,7 @@ app.post("/check_payment", async (req, res) => {
             console.warn(`Utilisateur ${user_id} non connecté au socket`);
           }
         }
+      
       } catch (error) {
         console.error("Erreur pendant l'interrogation MoMo :", error.message);
         clearInterval(interval); // Stop en cas d’erreur
@@ -425,42 +428,44 @@ app.post("/check_payment", async (req, res) => {
     const text = await omResponse.text(); // Lisez la réponse en texte
     console.log("Réponse brute de OM:", text);
 
-    let omResult;
-    if (text && text.trim() !== "") {
-      try {
-        omResult = JSON.parse(text);
-      } catch (error) {
-        console.error("Mauvais format du JSON");
-        return res.status(500).json({
-          message: "Mauvais format du JSON",
-          details: text,
-        });
-      }
-    } else {
-      console.warn("Réponse vide de om, on continue à interroger...");
-      return;
-    }
-
-    const status = omResult.data ? omResult.data.status : null;
-
-    if (status !== "PENDING") {
-      clearInterval(interval); // Stopper les requêtes
-
-      if (users[user_id]) {
-        users[user_id].forEach((socketId) => {
-          io.to(socketId).emit("payment_status", {
-            status: status,
-            timestamp: new Date().toLocaleTimeString(),
+    const interval = setInterval(async () => {
+      let omResult;
+      if (text && text.trim() !== "") {
+        try {
+          omResult = JSON.parse(text);
+        } catch (error) {
+          console.error("Mauvais format du JSON");
+          return res.status(500).json({
+            message: "Mauvais format du JSON",
+            details: text,
           });
-        });
-
-        const userPayment = await saveNewStatus(user_id, status);
-
-        return userPayment;
+        }
       } else {
-        console.warn(`Utilisateur ${user_id} non connecté au socket`);
+        console.warn("Réponse vide de om, on continue à interroger...");
+        return;
       }
-    }
+
+      const status = omResult.data ? omResult.data.status : null;
+
+      if (status !== "PENDING") {
+        clearInterval(interval); // Stopper les requêtes
+
+        if (users[user_id]) {
+          users[user_id].forEach((socketId) => {
+            io.to(socketId).emit("payment_status", {
+              status: status,
+              timestamp: new Date().toLocaleTimeString(),
+            });
+          });
+
+          const userPayment = await saveNewStatus(user_id, status);
+
+          return userPayment;
+        } else {
+          console.warn(`Utilisateur ${user_id} non connecté au socket`);
+        }
+      }
+    }, 2000);
   } else {
     console.error("Méthode de paiement non supportée:", paymentMethod);
     return res.status(400).json({
