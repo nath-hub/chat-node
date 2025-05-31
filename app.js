@@ -336,6 +336,8 @@ app.post("/check_payment", async (req, res) => {
 
     const [tokens, uuid, user_id, paymentMethod] = userPayment.split(";");
 
+    console.log("user_id:", user_id);
+
     if (paymentMethod == "MOMO") {
       const momoUrl = `https://proxy.momoapi.mtn.com/collection/v1_0/requesttopay/${uuid}`;
 
