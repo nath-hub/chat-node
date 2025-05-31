@@ -270,8 +270,7 @@ app.post(
   }
 );
 
-const getUser = async (token) => {
-  console.log("Token dans getUser:", token);
+const getUser = async (token) => { 
   try {
     const response = await fetch(
       "http://damam.zeta-messenger.com/api/get_user",
@@ -284,21 +283,21 @@ const getUser = async (token) => {
     );
 
     const paymentData = await response.json();
+ 
 
-    console.log("Données de paiement reçues:", paymentData);
-
-    if(!paymentData || !paymentData.payment) {
-      console.error("Données de paiement manquantes ou mal formées:", paymentData);
+    if (!paymentData || !paymentData.payment) {
+      console.error(
+        "Données de paiement manquantes ou mal formées:"
+      );
       return 0;
     }
- 
+
     const string = paymentData.payment.token;
     const paymentMethod = paymentData.payment.payment_method;
 
     const userId = paymentData.user.id; // ou `paymentData.user_id` selon la structure réelle
- 
+
     return `${string};${userId};${paymentMethod}`;
- 
   } catch (error) {
     console.error("Erreur lors de la récupération du user:", error);
     return [];
@@ -336,139 +335,137 @@ app.post("/check_payment", async (req, res) => {
     return res.status(401).json({ message: "Token non fourni ou invalide." });
   }
   const token = authHeader.split(" ")[1];
-
-  console.log("Token reçu:", token);
+ 
 
   // try {
-    const userPayment = await getUser(token);
+  const userPayment = await getUser(token);
 
-    if (!userPayment || userPayment.length === 0) {
-      console.error("Aucune donnée de paiement trouvée pour l'utilisateur.");
-      return res.status(404).json({
-        message: "Aucune donnée de paiement trouvée pour l'utilisateur.",
-      });
-    }
+  if (!userPayment || userPayment.length === 0) {
+    console.error("Aucune donnée de paiement trouvée pour l'utilisateur.");
+    return res.status(404).json({
+      message: "Aucune donnée de paiement trouvée pour l'utilisateur.",
+    });
+  }
 
-    const [tokens, uuid, user_id, paymentMethod] = userPayment.split(";");
+  const [tokens, uuid, user_id, paymentMethod] = userPayment.split(";");
+ 
 
-    console.log("user_id:", user_id);
+  if (paymentMethod == "MOMO") {
+    const momoUrl = `https://proxy.momoapi.mtn.com/collection/v1_0/requesttopay/${uuid}`;
 
-    if (paymentMethod == "MOMO") {
-      const momoUrl = `https://proxy.momoapi.mtn.com/collection/v1_0/requesttopay/${uuid}`;
+    const interval = setInterval(async () => {
+      try {
+        // Étape 2 : Interroger MTN MoMo
+        const momoResponse = await fetch(momoUrl, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${tokens}`,
+            "Ocp-Apim-Subscription-Key": "906338abaea74430ba31c146b14e51e5",
+            "X-Target-Environment": "mtncameroon",
+          },
+        });
 
-      const interval = setInterval(async () => {
-        try {
-          // Étape 2 : Interroger MTN MoMo
-          const momoResponse = await fetch(momoUrl, {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${tokens}`,
-              "Ocp-Apim-Subscription-Key": "906338abaea74430ba31c146b14e51e5",
-              "X-Target-Environment": "mtncameroon",
-            },
-          });
+        const text = await momoResponse.text(); // Lisez la réponse en texte
 
-          const text = await momoResponse.text(); // Lisez la réponse en texte
-
-          let momoResult;
-          if (text && text.trim() !== "") {
-            momoResult = JSON.parse(text);
-          } else {
-            console.warn("Réponse vide de MoMo, on continue à interroger...");
-            return;
-          }
-
-          console.log("Statut actuel :", momoResult.status);
-
-          if (momoResult.status !== "PENDING") {
-            clearInterval(interval); // Stopper les requêtes
-
-            if (users[user_id]) {
-              users[user_id].forEach((socketId) => {
-                io.to(socketId).emit("payment_status", {
-                  status: momoResult.status,
-                  timestamp: new Date().toLocaleTimeString(),
-                });
-              });
-
-              console.log(
-                `Status du payment envoyer à l'utilisateur ${user_id}:`,
-                momoResult.status
-              );
-
-              const userPayment = await saveNewStatus(
-                user_id,
-                momoResult.status
-              );
-
-              return userPayment;
-            } else {
-              console.warn(`Utilisateur ${user_id} non connecté au socket`);
-            }
-          }
-        } catch (error) {
-          console.error("Erreur pendant l'interrogation MoMo :", error.message);
-          clearInterval(interval); // Stop en cas d’erreur
-        }
-      }, 2000);
-
-      // console.log("Résultat de la requête MoMo:", momoResult);
-      res.status(200).json({ message: "Suivi du paiement lancé." });
-    } else if (paymentMethod == "OM") {
-      console.log("Attente du paiement OM pour l'utilisateur:", user_id);
-      const omUrl = `https://api-s1.orange.cm/omcoreapis/1.0.2/mp/paymentstatus/${tokens}`;
-
-      const omResponse = await fetch(omUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${uuid}`,
-          "X-AUTH-TOKEN": "WU5PVEVIRUFEMjpAWU5vVGVIRUBEMlBST0RBUEk=",
-        },
-      });
-
-      const text = await omResponse.text(); // Lisez la réponse en texte
-      console.log("Réponse brute de OM:" , text);
-
-      let omResult;
-      if (text && text.trim() !== "") {
-        omResult = JSON.parse(text);
-      } else {
-        console.warn("Réponse vide de om, on continue à interroger...");
-        return;
-      }
-
-      const status = omResult.data ? omResult.data.status : null;
-      console.log("Statut actuel :", status);
-
-      if (status !== "PENDING") {
-        clearInterval(interval); // Stopper les requêtes
-
-        if (users[user_id]) {
-          users[user_id].forEach((socketId) => {
-            io.to(socketId).emit("payment_status", {
-              status: status,
-              timestamp: new Date().toLocaleTimeString(),
-            });
-          });
-
-          console.log(
-            `Status du payment envoyer à l'utilisateur ${user_id}:`,
-            status
-          );
-
-          const userPayment = await saveNewStatus(user_id, status);
-
-          return userPayment;
+        let momoResult;
+        if (text && text.trim() !== "") {
+          momoResult = JSON.parse(text);
         } else {
-          console.warn(`Utilisateur ${user_id} non connecté au socket`);
+          console.warn("Réponse vide de MoMo, on continue à interroger...");
+          return;
         }
+
+        console.log("Statut actuel :", momoResult.status);
+
+        if (momoResult.status !== "PENDING") {
+          clearInterval(interval); // Stopper les requêtes
+
+          if (users[user_id]) {
+            users[user_id].forEach((socketId) => {
+              io.to(socketId).emit("payment_status", {
+                status: momoResult.status,
+                timestamp: new Date().toLocaleTimeString(),
+              });
+            });
+
+            console.log(
+              `Status du payment envoyer à l'utilisateur ${user_id}:`,
+              momoResult.status
+            );
+
+            const userPayment = await saveNewStatus(user_id, momoResult.status);
+
+            return userPayment;
+          } else {
+            console.warn(`Utilisateur ${user_id} non connecté au socket`);
+          }
+        }
+      } catch (error) {
+        console.error("Erreur pendant l'interrogation MoMo :", error.message);
+        clearInterval(interval); // Stop en cas d’erreur
       }
-    }else{
-      console.error("Méthode de paiement non supportée:", paymentMethod);
-      return res.status(400).json({
-        message: "Méthode de paiement non supportée.",
-      });
+    }, 2000);
+
+    // console.log("Résultat de la requête MoMo:", momoResult);
+    res.status(200).json({ message: "Suivi du paiement lancé." });
+  } else if (paymentMethod == "OM") {
+
+    const omUrl = `https://api-s1.orange.cm/omcoreapis/1.0.2/mp/paymentstatus/${tokens}`;
+
+    const omResponse = await fetch(omUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${uuid}`,
+        "X-AUTH-TOKEN": "WU5PVEVIRUFEMjpAWU5vVGVIRUBEMlBST0RBUEk=",
+      },
+    });
+
+    const text = await omResponse.text(); // Lisez la réponse en texte
+    console.log("Réponse brute de OM:", text);
+
+    let omResult;
+    if (text && text.trim() !== "") {
+      try {
+        omResult = JSON.parse(text);
+      } catch (error) {
+        console.error("Erreur lors du parsing JSON de la réponse OM:", error);
+        return res.status(500).json({
+          message: "Erreur de réponse JSON de l'API OM.",
+          details: text,
+        });
+      }
+    } else {
+      console.warn("Réponse vide de om, on continue à interroger...");
+      return;
     }
+
+    const status = omResult.data ? omResult.data.status : null; 
+
+    if (status !== "PENDING") {
+      clearInterval(interval); // Stopper les requêtes
+
+      if (users[user_id]) {
+        users[user_id].forEach((socketId) => {
+          io.to(socketId).emit("payment_status", {
+            status: status,
+            timestamp: new Date().toLocaleTimeString(),
+          });
+        });
+
+        
+        const userPayment = await saveNewStatus(user_id, status);
+
+        return userPayment;
+      } else {
+        console.warn(`Utilisateur ${user_id} non connecté au socket`);
+      }
+    }
+  } else {
+    console.error("Méthode de paiement non supportée:", paymentMethod);
+    return res.status(400).json({
+      message: "Méthode de paiement non supportée.",
+    });
+  }
   // } catch (error) {
   //   console.error(error);
   //   res
