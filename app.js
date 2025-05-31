@@ -331,7 +331,7 @@ app.post("/check_payment", async (req, res) => {
   }
   const token = authHeader.split(" ")[1];
 
-  try {
+  // try {
     const userPayment = await getUser(token);
 
     const [tokens, uuid, user_id, paymentMethod] = userPayment.split(";");
@@ -400,6 +400,7 @@ app.post("/check_payment", async (req, res) => {
       // console.log("Résultat de la requête MoMo:", momoResult);
       res.status(200).json({ message: "Suivi du paiement lancé." });
     } else if (paymentMethod == "OM") {
+      console.log("Attente du paiement OM pour l'utilisateur:", user_id);
       const omUrl = `https://api-s1.orange.cm/omcoreapis/1.0.2/mp/paymentstatus/${tokens}`;
 
       const omResponse = await fetch(omUrl, {
@@ -411,6 +412,7 @@ app.post("/check_payment", async (req, res) => {
       });
 
       const text = await omResponse.text(); // Lisez la réponse en texte
+      console.log("Réponse brute de OM:" , text);
 
       let omResult;
       if (text && text.trim() !== "") {
@@ -446,13 +448,18 @@ app.post("/check_payment", async (req, res) => {
           console.warn(`Utilisateur ${user_id} non connecté au socket`);
         }
       }
+    }else{
+      console.error("Méthode de paiement non supportée:", paymentMethod);
+      return res.status(400).json({
+        message: "Méthode de paiement non supportée.",
+      });
     }
-  } catch (error) {
-    console.error(error);
-    res
-      .status(500)
-      .json({ error: "Erreur lors de la vérification du paiement" });
-  }
+  // } catch (error) {
+  //   console.error(error);
+  //   res
+  //     .status(500)
+  //     .json({ error: "Erreur lors de la vérification du paiement" });
+  // }
 });
 
 // Démarrer le serveur
