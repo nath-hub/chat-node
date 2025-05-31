@@ -285,15 +285,15 @@ const getUser = async (token) => {
 
     const paymentData = await response.json();
 
+    console.log("Données de paiement reçues:", paymentData);
+ 
     const string = paymentData.payment.token;
     const paymentMethod = paymentData.payment.payment_method;
 
     const userId = paymentData.user.id; // ou `paymentData.user_id` selon la structure réelle
-
-    // On retourne une string complète : accessToken;uuid;userId
+ 
     return `${string};${userId};${paymentMethod}`;
-
-    return string;
+ 
   } catch (error) {
     console.error("Erreur lors de la récupération du user:", error);
     return [];
