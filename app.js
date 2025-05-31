@@ -286,6 +286,11 @@ const getUser = async (token) => {
     const paymentData = await response.json();
 
     console.log("Données de paiement reçues:", paymentData);
+
+    if(!paymentData || !paymentData.payment) {
+      console.error("Données de paiement manquantes ou mal formées:", paymentData);
+      return 0;
+    }
  
     const string = paymentData.payment.token;
     const paymentMethod = paymentData.payment.payment_method;
@@ -336,6 +341,13 @@ app.post("/check_payment", async (req, res) => {
 
   // try {
     const userPayment = await getUser(token);
+
+    if (!userPayment || userPayment.length === 0) {
+      console.error("Aucune donnée de paiement trouvée pour l'utilisateur.");
+      return res.status(404).json({
+        message: "Aucune donnée de paiement trouvée pour l'utilisateur.",
+      });
+    }
 
     const [tokens, uuid, user_id, paymentMethod] = userPayment.split(";");
 
