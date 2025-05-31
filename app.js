@@ -368,8 +368,16 @@ app.post("/check_payment", async (req, res) => {
 
             if (users[user_id]) {
               users[user_id].forEach((socketId) => {
-                io.to(socketId).emit("payment_status", momoResult.status);
+                io.to(socketId).emit("payment_status", {
+                  status: momoResult.status,
+                  timestamp: new Date().toLocaleTimeString(),
+                });
               });
+
+              console.log(
+                `Status du payment envoyer à l'utilisateur ${user_id}:`,
+                momoResult.status
+              );
 
               const userPayment = await saveNewStatus(
                 user_id,
@@ -418,8 +426,16 @@ app.post("/check_payment", async (req, res) => {
 
         if (users[user_id]) {
           users[user_id].forEach((socketId) => {
-            io.to(socketId).emit("payment_status", status);
+            io.to(socketId).emit("payment_status", {
+              status: status,
+              timestamp: new Date().toLocaleTimeString(),
+            });
           });
+
+          console.log(
+            `Status du payment envoyer à l'utilisateur ${user_id}:`,
+            status
+          );
 
           const userPayment = await saveNewStatus(user_id, status);
 
