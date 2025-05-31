@@ -270,7 +270,7 @@ app.post(
   }
 );
 
-const getUser = async (token) => { 
+const getUser = async (token) => {
   try {
     const response = await fetch(
       "http://damam.zeta-messenger.com/api/get_user",
@@ -283,12 +283,9 @@ const getUser = async (token) => {
     );
 
     const paymentData = await response.json();
- 
 
     if (!paymentData || !paymentData.payment) {
-      console.error(
-        "Données de paiement manquantes ou mal formées:"
-      );
+      console.error("Données de paiement manquantes ou mal formées:");
       return 0;
     }
 
@@ -335,7 +332,6 @@ app.post("/check_payment", async (req, res) => {
     return res.status(401).json({ message: "Token non fourni ou invalide." });
   }
   const token = authHeader.split(" ")[1];
- 
 
   // try {
   const userPayment = await getUser(token);
@@ -348,7 +344,6 @@ app.post("/check_payment", async (req, res) => {
   }
 
   const [tokens, uuid, user_id, paymentMethod] = userPayment.split(";");
- 
 
   if (paymentMethod == "MOMO") {
     const momoUrl = `https://proxy.momoapi.mtn.com/collection/v1_0/requesttopay/${uuid}`;
@@ -369,7 +364,15 @@ app.post("/check_payment", async (req, res) => {
 
         let momoResult;
         if (text && text.trim() !== "") {
-          momoResult = JSON.parse(text);
+          try {
+            momoResult = JSON.parse(text);
+          } catch (error) {
+            console.error("Mauvais format du JSON");
+            return res.status(500).json({
+              message: "Mauvais format du JSON",
+              details: text,
+            });
+          }
         } else {
           console.warn("Réponse vide de MoMo, on continue à interroger...");
           return;
@@ -409,7 +412,6 @@ app.post("/check_payment", async (req, res) => {
     // console.log("Résultat de la requête MoMo:", momoResult);
     res.status(200).json({ message: "Suivi du paiement lancé." });
   } else if (paymentMethod == "OM") {
-
     const omUrl = `https://api-s1.orange.cm/omcoreapis/1.0.2/mp/paymentstatus/${tokens}`;
 
     const omResponse = await fetch(omUrl, {
@@ -428,9 +430,9 @@ app.post("/check_payment", async (req, res) => {
       try {
         omResult = JSON.parse(text);
       } catch (error) {
-        console.error("Erreur lors du parsing JSON de la réponse OM:", error);
+        console.error("Mauvais format du JSON");
         return res.status(500).json({
-          message: "Erreur de réponse JSON de l'API OM.",
+          message: "Mauvais format du JSON",
           details: text,
         });
       }
@@ -439,7 +441,7 @@ app.post("/check_payment", async (req, res) => {
       return;
     }
 
-    const status = omResult.data ? omResult.data.status : null; 
+    const status = omResult.data ? omResult.data.status : null;
 
     if (status !== "PENDING") {
       clearInterval(interval); // Stopper les requêtes
@@ -452,7 +454,6 @@ app.post("/check_payment", async (req, res) => {
           });
         });
 
-        
         const userPayment = await saveNewStatus(user_id, status);
 
         return userPayment;
