@@ -271,6 +271,7 @@ app.post(
 );
 
 const getUser = async (token) => {
+  console.log("Token dans getUser:", token);
   try {
     const response = await fetch(
       "http://damam.zeta-messenger.com/api/get_user",
@@ -330,6 +331,8 @@ app.post("/check_payment", async (req, res) => {
     return res.status(401).json({ message: "Token non fourni ou invalide." });
   }
   const token = authHeader.split(" ")[1];
+
+  console.log("Token reçu:", token);
 
   // try {
     const userPayment = await getUser(token);
