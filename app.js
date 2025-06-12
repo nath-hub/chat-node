@@ -1,5 +1,5 @@
 const express = require("express");
-const http = require("http");
+const https = require("https");
 const socketIo = require("socket.io");
 const bodyParser = require("body-parser");
 const cors = require("cors");
@@ -12,7 +12,7 @@ const { stat } = require("fs");
 // Initialisation du serveur Express et du serveur HTTP
 const app = express();
 app.use(express.json());
-const server = http.createServer(app);
+const server = https.createServer(app);
 const io = socketIo(server, {
   cors: {
     origin: "*",
@@ -90,7 +90,7 @@ io.on("connection", (socket) => {
 const getAdminIds = async () => {
   try {
     const response = await fetch(
-      "http://damam.zeta-messenger.com/api/getAdmin",
+      "http://damam.zeta-app.fr/api/getAdmin",
       {
         method: "GET",
       }
@@ -136,7 +136,7 @@ app.post("/send-message", upload.single("piece_jointe"), async (req, res) => {
 
     // Requête fetch vers l'API externe
     const response = await fetch(
-      "http://damam.zeta-messenger.com/api/messages",
+      "http://damam.zeta-app.fr/api/messages",
       {
         method: "POST",
         headers: {
@@ -227,7 +227,7 @@ app.post(
 
       // Envoi du message à chaque admin
       const response = await fetch(
-        "http://damam.zeta-messenger.com/api/send_messages_to_support",
+        "http://damam.zeta-app.fr/api/send_messages_to_support",
         {
           method: "POST",
           headers: {
@@ -274,7 +274,7 @@ app.post(
 const getUser = async (token) => {
   try {
     const response = await fetch(
-      "http://damam.zeta-messenger.com/api/get_user",
+      "http://damam.zeta-app.fr/api/get_user",
       {
         method: "GET",
         headers: {
@@ -310,7 +310,7 @@ const saveNewStatus = async (user_id, status) => {
     formData.append("status", status);
 
     const response = await fetch(
-      "http://damam.zeta-messenger.com/api/save_new_status",
+      "http://damam.zeta-app.fr/api/save_new_status",
       {
         method: "POST",
         body: formData,
