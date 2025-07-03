@@ -7,8 +7,7 @@ const FormData = require("form-data");
 const multer = require("multer");
 const fs = require("fs");
 
-const fetch = require("node-fetch"); 
- 
+const fetch = require("node-fetch");
 
 // Initialisation du serveur Express et du serveur HTTP
 const app = express();
@@ -90,12 +89,9 @@ io.on("connection", (socket) => {
 
 const getAdminIds = async () => {
   try {
-    const response = await fetch(
-      "http://develop.zeta-app.fr/api/getAdmin",
-      {
-        method: "GET",
-      }
-    );
+    const response = await fetch("http://develop.zeta-app.fr/api/getAdmin", {
+      method: "GET",
+    });
 
     const admins = await response.json();
     return admins.map((admin) => admin.id); // Supposons que l'API retourne une liste d'admins { id: ... }
@@ -136,16 +132,13 @@ app.post("/send-message", upload.single("piece_jointe"), async (req, res) => {
     }
 
     // Requête fetch vers l'API externe
-    const response = await fetch(
-      "http://develop.zeta-app.fr/api/messages",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`, // Pas de Content-Type car géré par form-data
-        },
-        body: formData,
-      }
-    );
+    const response = await fetch("http://develop.zeta-app.fr/api/messages", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`, // Pas de Content-Type car géré par form-data
+      },
+      body: formData,
+    });
 
     const rawResponse = await response.text(); // Lire le texte brut de la réponse
     console.log("Réponse brute de l'API externe:", rawResponse);
@@ -274,15 +267,12 @@ app.post(
 
 const getUser = async (token) => {
   try {
-    const response = await fetch(
-      "http://develop.zeta-app.fr/api/get_user",
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`, // Pas de Content-Type car géré par form-data
-        },
-      }
-    );
+    const response = await fetch("http://develop.zeta-app.fr/api/get_user", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`, // Pas de Content-Type car géré par form-data
+      },
+    });
 
     const paymentData = await response.json();
 
@@ -297,6 +287,34 @@ const getUser = async (token) => {
     const userId = paymentData.user.id; // ou `paymentData.user_id` selon la structure réelle
 
     return `${string};${userId};${paymentMethod}`;
+  } catch (error) {
+    console.error("Erreur lors de la récupération du user:", error);
+    return [];
+  }
+};
+
+const updateBooking = async (token, id, status) => {
+  try {
+    const formData = new FormData();
+
+    formData.append("id", id);
+    formData.append("status", status);
+
+    const response = await fetch(
+      "http://develop.zeta-app.fr/api/booking/change_status",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,  
+        },
+        body: formData,
+      }
+    );
+
+    if (response.ok) {
+      return true;
+    }
+    return true;
   } catch (error) {
     console.error("Erreur lors de la récupération du user:", error);
     return [];
@@ -400,6 +418,8 @@ app.post("/check_payment", async (req, res) => {
             });
 
             await saveNewStatus(user_id, momoResult.status);
+            await updateBooking(token, momoResult.booking_id, momoResult.status);
+            
           } else {
             console.warn(`Utilisateur ${user_id} non connecté au socket`);
           }
@@ -449,7 +469,7 @@ app.post("/check_payment", async (req, res) => {
 
         const status = omResult?.data?.status;
         console.log("OM statut:", status);
-console.log("avant socket", user_id);
+        console.log("avant socket", user_id);
         if (status !== "PENDING") {
           clearInterval(interval);
           console.log("apres", user_id);
@@ -463,6 +483,8 @@ console.log("avant socket", user_id);
             });
 
             await saveNewStatus(user_id, status);
+            await updateBooking(token, omResult.data.booking_id, status);
+            
           } else {
             console.warn(`Utilisateur ${user_id} non connecté au socket`);
           }
