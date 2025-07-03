@@ -293,33 +293,7 @@ const getUser = async (token) => {
   }
 };
 
-const updateBooking = async (token, id, status) => {
-  try {
-    const formData = new FormData();
 
-    formData.append("id", id);
-    formData.append("status", status);
-
-    const response = await fetch(
-      "http://develop.zeta-app.fr/api/booking/change_status",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,  
-        },
-        body: formData,
-      }
-    );
-
-    if (response.ok) {
-      return true;
-    }
-    return true;
-  } catch (error) {
-    console.error("Erreur lors de la récupération du user:", error);
-    return [];
-  }
-};
 
 const saveNewStatus = async (user_id, status) => {
   try {
@@ -417,8 +391,7 @@ app.post("/check_payment", async (req, res) => {
               });
             });
 
-            await saveNewStatus(user_id, momoResult.status);
-            await updateBooking(token, momoResult.booking_id, momoResult.status);
+            await saveNewStatus(user_id, momoResult.status); 
             
           } else {
             console.warn(`Utilisateur ${user_id} non connecté au socket`);
@@ -482,8 +455,7 @@ app.post("/check_payment", async (req, res) => {
               });
             });
 
-            await saveNewStatus(user_id, status);
-            await updateBooking(token, omResult.data.booking_id, status);
+            await saveNewStatus(user_id, status); 
             
           } else {
             console.warn(`Utilisateur ${user_id} non connecté au socket`);
