@@ -5,14 +5,19 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const FormData = require("form-data");
 const multer = require("multer");
+const fs = require("fs");
 
-const fetch = require("node-fetch");
-const { stat } = require("fs");
+const fetch = require("node-fetch"); 
+
+const options = {
+  key: fs.readFileSync("/etc/letsencrypt/live/chat.damam-group.com/privkey.pem"),
+  cert: fs.readFileSync("/etc/letsencrypt/live/chat.damam-group.com/fullchain.pem"),
+};
 
 // Initialisation du serveur Express et du serveur HTTP
 const app = express();
 app.use(express.json());
-const server = https.createServer(app);
+const server = https.createServer(options, app);
 const io = socketIo(server, {
   cors: {
     origin: "*",
