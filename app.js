@@ -89,7 +89,7 @@ io.on("connection", (socket) => {
 
 const getAdminIds = async () => {
   try {
-    const response = await fetch("http://develop.zeta-app.fr/api/getAdmin", {
+    const response = await fetch("https://backend.damam-group.com/api/getAdmin", {
       method: "GET",
     });
 
@@ -132,7 +132,7 @@ app.post("/send-message", upload.single("piece_jointe"), async (req, res) => {
     }
 
     // Requête fetch vers l'API externe
-    const response = await fetch("http://develop.zeta-app.fr/api/messages", {
+    const response = await fetch("https://backend.damam-group.com/api/messages", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`, // Pas de Content-Type car géré par form-data
@@ -221,7 +221,7 @@ app.post(
 
       // Envoi du message à chaque admin
       const response = await fetch(
-        "http://develop.zeta-app.fr/api/send_messages_to_support",
+        "https://backend.damam-group.com/api/send_messages_to_support",
         {
           method: "POST",
           headers: {
@@ -267,7 +267,7 @@ app.post(
 
 const getUser = async (token) => {
   try {
-    const response = await fetch("http://develop.zeta-app.fr/api/get_user", {
+    const response = await fetch("https://backend.damam-group.com/api/get_user", {
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`, // Pas de Content-Type car géré par form-data
@@ -303,7 +303,7 @@ const saveNewStatus = async (user_id, status) => {
     formData.append("status", status);
 
     const response = await fetch(
-      "http://develop.zeta-app.fr/api/save_new_status",
+      "https://backend.damam-group.com/api/save_new_status",
       {
         method: "POST",
         body: formData,
