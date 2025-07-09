@@ -40,7 +40,8 @@ io.on("connection", (socket) => {
       users[user_id] = []; // Initialiser un tableau pour stocker plusieurs sockets
     }
 
-    users[user_id].push(socket.id);
+    // users[user_id].push(socket.id);
+    socket.user_id = user_id;
 
     console.log(
       `Utilisateur ${user_id} enregistré avec socket ID: ${socket.id}`
@@ -50,48 +51,106 @@ io.on("connection", (socket) => {
   // Gérer l'envoi de messages
   socket.on("send_message", (data) => {
     console.log("Données reçues du client:", data);
+
+    if (!data || typeof data !== "object") {
+      console.error("Données invalides reçues:", data);
+      socket.emit("error", { message: "Données invalides" });
+      return;
+    }
+
     const { sender_id, receiver_id, message, piece_jointe } = data;
+
+    // Validation des données
+    if (!sender_id || !receiver_id || !message) {
+      console.error("Données manquantes:", { sender_id, receiver_id, message });
+      socket.emit("error", {
+        message: "Données manquantes (sender_id, receiver_id, message)",
+      });
+      return;
+    }
 
     if (typeof message !== "string") {
       console.error("Message mal formé :", message);
+      socket.emit("error", {
+        message: "Le message doit être une chaîne de caractères",
+      });
       return;
     }
+
     // Vérifier si le receiver_id est connecté
-    const receiverSocketId = users[receiver_id];
-    if (receiverSocketId) {
-      // Envoyer le message au destinataire spécifique
-      io.to(receiverSocketId).emit("receive_message", {
-        sender_id: sender_id,
+    const receiverSocketIds = users[receiver_id];
+    if (receiverSocketIds && receiverSocketIds.length > 0) {
+      // Envoyer le message à tous les sockets du destinataire
+      receiverSocketIds.forEach((socketId) => {
+        io.to(socketId).emit("receive_message", {
+          sender_id: sender_id,
+          receiver_id: receiver_id,
+          message: message,
+          piece_jointe: piece_jointe,
+          timestamp: new Date().toISOString(),
+        });
+      });
+
+      // Confirmer l'envoi à l'expéditeur
+      socket.emit("message_sent", {
         receiver_id: receiver_id,
         message: message,
-        piece_jointe: piece_jointe,
-        timestamp: new Date().toLocaleTimeString(),
+        timestamp: new Date().toISOString(),
       });
+
       console.log(`Message de ${sender_id} à ${receiver_id}: ${message}`);
     } else {
       console.log(`Utilisateur ${receiver_id} non connecté.`);
+      socket.emit("user_offline", {
+        receiver_id: receiver_id,
+        message: "Le destinataire n'est pas connecté",
+      });
     }
   });
 
+  // Gestion de la déconnexion
   socket.on("disconnect", () => {
-    for (let user_id in users) {
-      users[user_id] = users[user_id].filter(
-        (socketId) => socketId !== socket.id
-      );
+    console.log(`Socket déconnecté : ${socket.id}`);
 
-      if (users[user_id].length === 0) {
-        delete users[user_id]; // Supprimer l'entrée si aucun socket connecté
+    // Si l'user_id est associé au socket, nettoyer directement
+    if (socket.user_id) {
+      if (users[socket.user_id]) {
+        users[socket.user_id] = users[socket.user_id].filter(
+          (socketId) => socketId !== socket.id
+        );
+
+        if (users[socket.user_id].length === 0) {
+          delete users[socket.user_id];
+        }
       }
-      console.log(`Un utilisateur s'est déconnecté : ${socket.id}`);
+    } else {
+      // Fallback : parcourir tous les utilisateurs
+      for (let user_id in users) {
+        users[user_id] = users[user_id].filter(
+          (socketId) => socketId !== socket.id
+        );
+
+        if (users[user_id].length === 0) {
+          delete users[user_id];
+        }
+      }
     }
+
+    console.log(
+      "Utilisateurs connectés après déconnexion:",
+      Object.keys(users)
+    );
   });
 });
 
 const getAdminIds = async () => {
   try {
-    const response = await fetch("https://backend.damam-group.com/api/getAdmin", {
-      method: "GET",
-    });
+    const response = await fetch(
+      "https://backend.damam-group.com/api/getAdmin",
+      {
+        method: "GET",
+      }
+    );
 
     const admins = await response.json();
     return admins.map((admin) => admin.id); // Supposons que l'API retourne une liste d'admins { id: ... }
@@ -132,13 +191,16 @@ app.post("/send-message", upload.single("piece_jointe"), async (req, res) => {
     }
 
     // Requête fetch vers l'API externe
-    const response = await fetch("https://backend.damam-group.com/api/messages", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`, // Pas de Content-Type car géré par form-data
-      },
-      body: formData,
-    });
+    const response = await fetch(
+      "https://backend.damam-group.com/api/messages",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`, // Pas de Content-Type car géré par form-data
+        },
+        body: formData,
+      }
+    );
 
     const rawResponse = await response.text(); // Lire le texte brut de la réponse
     console.log("Réponse brute de l'API externe:", rawResponse);
@@ -192,6 +254,13 @@ app.post(
   async (req, res) => {
     const { user_id, message } = req.body;
 
+    // Validation des données
+    if (!user_id || !message) {
+      return res.status(400).json({
+        message: "user_id et message sont requis.",
+      });
+    }
+
     // Vérification du token
     const authHeader = req.headers["authorization"];
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -201,13 +270,16 @@ app.post(
 
     try {
       const adminIds = await getAdminIds();
+      console.log("Admin IDs:", adminIds);
 
-      console.log(adminIds);
+      if (!adminIds || adminIds.length === 0) {
+        return res
+          .status(404)
+          .json({ message: "Aucun administrateur trouvé." });
+      }
 
       const formData = new FormData();
-
-      formData.append("user_id", req.body.user_id ?? "");
-      // formData.append('receiver_id', adminId);
+      formData.append("user_id", user_id);
       formData.append("message", message);
 
       // Ajouter la pièce jointe si elle existe
@@ -219,7 +291,7 @@ app.post(
         );
       }
 
-      // Envoi du message à chaque admin
+      // Envoi du message à l'API Laravel
       const response = await fetch(
         "https://backend.damam-group.com/api/send_messages_to_support",
         {
@@ -234,45 +306,59 @@ app.post(
       const rawResponse = await response.text();
 
       if (!response.ok) {
-        console.error(`Erreur lors de l'envoi à l'admin`, rawResponse);
-      } else {
-        console.log(`Message envoyé avec succès à l'admin`);
+        console.error(`Erreur lors de l'envoi à l'API Laravel:`, rawResponse);
+        return res.status(500).json({
+          message: "Erreur lors de l'envoi à l'API Laravel",
+          error: rawResponse,
+        });
       }
 
+      console.log(`Message envoyé avec succès à l'API Laravel`);
+
+      // Envoyer le message via Socket.IO à tous les admins connectés
+      let adminNotified = 0;
       adminIds.forEach((adminId) => {
-        if (users[adminId]) {
-          // Vérifier si l'admin est connecté
+        if (users[adminId] && users[adminId].length > 0) {
           users[adminId].forEach((socketId) => {
             io.to(socketId).emit("receive_message", {
               sender_id: user_id,
               receiver_id: adminId,
               message: message,
               piece_jointe: req.file ? req.file.originalname : null,
+              timestamp: new Date().toISOString(),
+              is_support_message: true,
             });
           });
+          adminNotified++;
         }
       });
 
-      res
-        .status(200)
-        .json({ message: "Messages envoyés aux administrateurs avec succès." });
+      res.status(200).json({
+        message: "Messages envoyés aux administrateurs avec succès.",
+        admins_notified: adminNotified,
+        total_admins: adminIds.length,
+      });
     } catch (error) {
       console.error("Erreur lors de la requête fetch:", error);
-      res
-        .status(500)
-        .json({ message: "Erreur lors de l'envoi des messages", error });
+      res.status(500).json({
+        message: "Erreur lors de l'envoi des messages",
+        error: error.message,
+      });
     }
   }
 );
 
 const getUser = async (token) => {
   try {
-    const response = await fetch("https://backend.damam-group.com/api/get_user", {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`, // Pas de Content-Type car géré par form-data
-      },
-    });
+    const response = await fetch(
+      "https://backend.damam-group.com/api/get_user",
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`, // Pas de Content-Type car géré par form-data
+        },
+      }
+    );
 
     const paymentData = await response.json();
 
@@ -292,8 +378,6 @@ const getUser = async (token) => {
     return [];
   }
 };
-
-
 
 const saveNewStatus = async (user_id, status) => {
   try {
@@ -391,8 +475,7 @@ app.post("/check_payment", async (req, res) => {
               });
             });
 
-            await saveNewStatus(user_id, momoResult.status); 
-            
+            await saveNewStatus(user_id, momoResult.status);
           } else {
             console.warn(`Utilisateur ${user_id} non connecté au socket`);
           }
@@ -455,8 +538,7 @@ app.post("/check_payment", async (req, res) => {
               });
             });
 
-            await saveNewStatus(user_id, status); 
-            
+            await saveNewStatus(user_id, status);
           } else {
             console.warn(`Utilisateur ${user_id} non connecté au socket`);
           }
