@@ -40,7 +40,11 @@ io.on("connection", (socket) => {
       users[user_id] = []; // Initialiser un tableau pour stocker plusieurs sockets
     }
 
-    // users[user_id].push(socket.id);
+    if (!users[user_id].includes(socket.id)) {
+      users[user_id].push(socket.id);
+    }
+
+    // Associer l'user_id au socket pour la déconnexion
     socket.user_id = user_id;
 
     console.log(
@@ -51,6 +55,7 @@ io.on("connection", (socket) => {
   // Gérer l'envoi de messages
   socket.on("send_message", (data) => {
     console.log("Données reçues du client:", data);
+    console.log("État actuel des utilisateurs:", users);
 
     if (!data || typeof data !== "object") {
       console.error("Données invalides reçues:", data);
@@ -79,9 +84,17 @@ io.on("connection", (socket) => {
 
     // Vérifier si le receiver_id est connecté
     const receiverSocketIds = users[receiver_id];
-    if (receiverSocketIds && receiverSocketIds.length > 0) {
+    console.log(`Recherche du destinataire ${receiver_id}:`, receiverSocketIds);
+
+    if (
+      receiverSocketIds &&
+      Array.isArray(receiverSocketIds) &&
+      receiverSocketIds.length > 0
+    ) {
       // Envoyer le message à tous les sockets du destinataire
+      let messagesSent = 0;
       receiverSocketIds.forEach((socketId) => {
+        console.log(`Envoi du message vers socket ${socketId}`);
         io.to(socketId).emit("receive_message", {
           sender_id: sender_id,
           receiver_id: receiver_id,
@@ -89,6 +102,7 @@ io.on("connection", (socket) => {
           piece_jointe: piece_jointe,
           timestamp: new Date().toISOString(),
         });
+        messagesSent++;
       });
 
       // Confirmer l'envoi à l'expéditeur
@@ -96,14 +110,21 @@ io.on("connection", (socket) => {
         receiver_id: receiver_id,
         message: message,
         timestamp: new Date().toISOString(),
+        sockets_notified: messagesSent,
       });
 
-      console.log(`Message de ${sender_id} à ${receiver_id}: ${message}`);
+      console.log(
+        `Message de ${sender_id} à ${receiver_id}: ${message} (${messagesSent} sockets notifiés)`
+      );
     } else {
-      console.log(`Utilisateur ${receiver_id} non connecté.`);
+      console.log(
+        `Utilisateur ${receiver_id} non connecté. Utilisateurs disponibles:`,
+        Object.keys(users)
+      );
       socket.emit("user_offline", {
         receiver_id: receiver_id,
         message: "Le destinataire n'est pas connecté",
+        available_users: Object.keys(users),
       });
     }
   });
@@ -140,6 +161,11 @@ io.on("connection", (socket) => {
       "Utilisateurs connectés après déconnexion:",
       Object.keys(users)
     );
+  });
+
+  // Événement pour obtenir la liste des utilisateurs connectés
+  socket.on("get_online_users", () => {
+    socket.emit("online_users", Object.keys(users));
   });
 });
 
