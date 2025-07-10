@@ -8,6 +8,7 @@ const multer = require("multer");
 const fs = require("fs");
 
 const fetch = require("node-fetch");
+const { send } = require("process");
 
 // Initialisation du serveur Express et du serveur HTTP
 const app = express();
@@ -608,6 +609,20 @@ app.post(
           });
         }
 
+        messages.push({
+          sender_id: $userInline, // ID de l'admin qui envoie
+          receiver_id: user_id, // ID de l'utilisateur qui reçoit
+          message: message,
+          is_support_message: true,
+          timestamp: new Date().toISOString(),
+          piece_jointe: req.file ? req.file.originalname : null,
+        });
+
+        // Limiter le stockage pour éviter la surcharge mémoire
+        if (messages.length > 1000) {
+          messages = messages.slice(-500); // Garder les 500 derniers
+        }
+
         console.log(
           `Message envoyé à l'utilisateur ${user_id} par l'admin ${$userInline}:`,
           message
@@ -628,6 +643,21 @@ app.post(
                 piece_jointe: req.file ? req.file.originalname : null,
               });
             });
+
+            messages.push({
+              sender_id: $userInline,
+              receiver_id: adminId,
+              message: message,
+              is_support_message: true,
+              timestamp: new Date().toISOString(),
+              piece_jointe: req.file ? req.file.originalname : null,
+            });
+
+            // Limiter le stockage pour éviter la surcharge mémoire
+            if (messages.length > 1000) {
+              messages = messages.slice(-500); // Garder les 500 derniers
+            }
+
             console.log(
               `Message envoyé à l'admin ${user_id} par l'utilisateur ${$userInline} :`,
               message
@@ -651,6 +681,41 @@ app.post(
     }
   }
 );
+
+// Exemple : Vérification des nouveaux messages pour un utilisateur
+app.get("/api/socket-messages/:user_id", (req, res) => {
+  const { user_id } = req.params;
+
+  try {
+    if (!user_id || user_id.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        error: "user_id requis",
+      });
+    }
+
+    const userId = parseInt(user_id, 10);
+
+    const receivedMessagesForUser = messages.filter((message) => {
+      return message.receiver_id === userId;
+    });
+
+    res.json({
+      success: true,
+      user_id: userId,
+      messages: receivedMessagesForUser, 
+      total: receivedMessagesForUser.length,
+    });
+
+   
+  } catch (error) {
+    console.error("Erreur récupération messages:", error);
+    res.status(500).json({
+      success: false,
+      error: "Erreur serveur",
+    });
+  }
+});
 
 const getUser = async (token) => {
   try {
