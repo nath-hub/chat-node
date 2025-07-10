@@ -31,109 +31,279 @@ app.use(cors());
 let users = {}; // Associe `user_id` à `socket.id`
 let messages = []; // Stocke temporairement les messages (optionnel)
 
+const rateLimiter = new Map();
+
+// Fonction pour nettoyer les rate limits expirés
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, data] of rateLimiter.entries()) {
+    if (now > data.resetTime) {
+      rateLimiter.delete(key);
+    }
+  }
+}, 60000);
+
+// Fonction de validation et sanitisation
+function validateAndSanitizeMessage(data) {
+  if (!data || typeof data !== "object") {
+    throw new Error("Données invalides");
+  }
+
+  const { sender_id, receiver_id, message, piece_jointe } = data;
+
+  // Validation des champs requis
+  if (!sender_id || !receiver_id || !message) {
+    throw new Error("Données manquantes (sender_id, receiver_id, message)");
+  }
+
+  if (typeof message !== "string") {
+    throw new Error("Le message doit être une chaîne de caractères");
+  }
+
+  // Validation de la longueur
+  if (message.trim().length === 0) {
+    throw new Error("Le message ne peut pas être vide");
+  }
+
+  // Sanitisation
+  const sanitizedMessage = message.trim().substring(0, 1000);
+
+  // Validation des caractères spéciaux malveillants
+  const dangerousPatterns = /<script|javascript:|on\w+=/i;
+  if (dangerousPatterns.test(sanitizedMessage)) {
+    throw new Error("Message contient du contenu potentiellement dangereux");
+  }
+
+  return {
+    sender_id: sender_id,
+    receiver_id: receiver_id,
+    message: sanitizedMessage,
+    piece_jointe: piece_jointe,
+  };
+}
+
+// Fonction de rate limiting
+function checkRateLimit(userId) {
+  const now = Date.now();
+  const userLimit = rateLimiter.get(userId) || {
+    count: 0,
+    resetTime: now + 60000, // 1 minute
+  };
+
+  if (now > userLimit.resetTime) {
+    userLimit.count = 0;
+    userLimit.resetTime = now + 60000;
+  }
+
+  if (userLimit.count >= 30) {
+    // Max 30 messages par minute
+    throw new Error("Trop de messages envoyés, veuillez patienter");
+  }
+
+  userLimit.count++;
+  rateLimiter.set(userId, userLimit);
+}
+
 io.on("connection", (socket) => {
   console.log("Un utilisateur est connecté avec socket ID:", socket.id);
 
+  // Timeout pour les connexions inactives
+  let activityTimeout = setTimeout(() => {
+    console.log(`Déconnexion pour inactivité: ${socket.id}`);
+    socket.disconnect();
+  }, 30 * 60 * 1000); // 30 minutes
+
+  // Réinitialiser le timeout à chaque activité
+  function resetActivityTimeout() {
+    clearTimeout(activityTimeout);
+    activityTimeout = setTimeout(() => {
+      console.log(`Déconnexion pour inactivité: ${socket.id}`);
+      socket.disconnect();
+    }, 30 * 60 * 1000);
+  }
+
   // Lorsqu'un utilisateur s'enregistre
-  socket.on("register_user", (user_id) => {
-    if (!users[user_id]) {
-      users[user_id] = []; // Initialiser un tableau pour stocker plusieurs sockets
+  socket.on("register_user", (userId) => {
+    resetActivityTimeout();
+
+    console.log(`Enregistrement de l'utilisateur: ${userId}`);
+    try {
+      // let userId;
+      console.log(userId);
+
+      // Validation de la longueur de l'user_id après nettoyage
+      if (userId.length === 0 || userId.length > 50) {
+        throw new Error(
+          "L'ID utilisateur doit faire entre 1 et 50 caractères."
+        );
+      }
+
+      // Vérifier si l'utilisateur est déjà enregistré avec ce socket
+      if (socket.user_id === userId) {
+        console.log(`Utilisateur "${userId}" déjà enregistré avec ce socket.`);
+        return;
+      }
+
+      // Si le socket avait un autre user_id, le nettoyer
+      if (socket.user_id && users[socket.user_id]) {
+        users[socket.user_id] = users[socket.user_id].filter(
+          (socketId) => socketId !== socket.id
+        );
+        if (users[socket.user_id].length === 0) {
+          delete users[socket.user_id];
+        }
+        console.log(`Ancien enregistrement pour "${socket.user_id}" nettoyé.`);
+      }
+
+      // Enregistrer le nouvel utilisateur
+      if (!users[userId]) {
+        users[userId] = [];
+      }
+      users[userId].push(socket.id);
+      socket.user_id = userId; // Assigner l'ID à l'objet socket pour un suivi ultérieur
+
+      console.log(
+        `Utilisateur "${userId}" enregistré avec socket ID: ${socket.id}.`
+      );
+
+      // Confirmer l'enregistrement
+      socket.emit("registration_success", {
+        console: "Utilisateur enregistré avec succès",
+        user_id: userId,
+        socket_id: socket.id,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Erreur lors de l'enregistrement:", error.message);
+      socket.emit("registration_error", { message: error.message });
     }
-
-    if (!users[user_id].includes(socket.id)) {
-      users[user_id].push(socket.id);
-    }
-
-    // Associer l'user_id au socket pour la déconnexion
-    socket.user_id = user_id;
-
-    console.log(
-      `Utilisateur ${user_id} enregistré avec socket ID: ${socket.id}`
-    );
   });
 
   // Gérer l'envoi de messages
+  // Gérer l'envoi de messages
   socket.on("send_message", (data) => {
-    console.log("Données reçues du client:", data);
-    console.log("État actuel des utilisateurs:", users);
+    resetActivityTimeout();
 
-    if (!data || typeof data !== "object") {
-      console.error("Données invalides reçues:", data);
-      socket.emit("error", { message: "Données invalides" });
-      return;
-    }
+    try {
+      console.log("Données reçues du client:", data);
 
-    const { sender_id, receiver_id, message, piece_jointe } = data;
+      // Validation et sanitisation
+      const validatedData = validateAndSanitizeMessage(data);
+      const { sender_id, receiver_id, message, piece_jointe } = validatedData;
 
-    // Validation des données
-    if (!sender_id || !receiver_id || !message) {
-      console.error("Données manquantes:", { sender_id, receiver_id, message });
-      socket.emit("error", {
-        message: "Données manquantes (sender_id, receiver_id, message)",
-      });
-      return;
-    }
+      // Vérifier que l'expéditeur correspond au socket enregistré
+      if (socket.user_id !== sender_id) {
+        console.log(sender_id, socket.user_id, socket.id);
+        throw new Error(
+          "sender_id ne correspond pas à l'utilisateur enregistré"
+        );
+      }
 
-    if (typeof message !== "string") {
-      console.error("Message mal formé :", message);
-      socket.emit("error", {
-        message: "Le message doit être une chaîne de caractères",
-      });
-      return;
-    }
+      // Rate limiting
+      checkRateLimit(sender_id);
 
-    // Vérifier si le receiver_id est connecté
-    const receiverSocketIds = users[receiver_id];
-    console.log(`Recherche du destinataire ${receiver_id}:`, receiverSocketIds);
+      // Éviter l'auto-envoi
+      if (sender_id === receiver_id) {
+        throw new Error("Impossible d'envoyer un message à soi-même");
+      }
 
-    if (
-      receiverSocketIds &&
-      Array.isArray(receiverSocketIds) &&
-      receiverSocketIds.length > 0
-    ) {
-      // Envoyer le message à tous les sockets du destinataire
-      let messagesSent = 0;
-      receiverSocketIds.forEach((socketId) => {
-        console.log(`Envoi du message vers socket ${socketId}`);
-        io.to(socketId).emit("receive_message", {
+      // Vérifier si le receiver_id est connecté
+      const receiverSocketIds = users[receiver_id];
+      console.log(
+        `Recherche du destinataire ${receiver_id}:`,
+        receiverSocketIds
+      );
+
+      if (
+        receiverSocketIds &&
+        Array.isArray(receiverSocketIds) &&
+        receiverSocketIds.length > 0
+      ) {
+        // Préparer le message avec timestamp et ID unique
+        const messageData = {
+          id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           sender_id: sender_id,
           receiver_id: receiver_id,
           message: message,
           piece_jointe: piece_jointe,
           timestamp: new Date().toISOString(),
+        };
+
+        // Envoyer le message à tous les sockets du destinataire
+        let messagesSent = 0;
+        const failedSockets = [];
+
+        receiverSocketIds.forEach((socketId) => {
+          try {
+            console.log(`Envoi du message vers socket ${socketId}`);
+            io.to(socketId).emit("receive_message", messageData);
+            messagesSent++;
+          } catch (error) {
+            console.error(`Erreur envoi vers socket ${socketId}:`, error);
+            failedSockets.push(socketId);
+          }
         });
-        messagesSent++;
-      });
 
-      // Confirmer l'envoi à l'expéditeur
-      socket.emit("message_sent", {
-        receiver_id: receiver_id,
-        message: message,
+        // Nettoyer les sockets défaillants
+        if (failedSockets.length > 0) {
+          users[receiver_id] = users[receiver_id].filter(
+            (socketId) => !failedSockets.includes(socketId)
+          );
+          if (users[receiver_id].length === 0) {
+            delete users[receiver_id];
+          }
+        }
+
+        // Confirmer l'envoi à l'expéditeur
+        socket.emit("message_sent", {
+          message_id: messageData.id,
+          receiver_id: receiver_id,
+          message: message,
+          timestamp: messageData.timestamp,
+          sockets_notified: messagesSent,
+          failed_sockets: failedSockets.length,
+        });
+
+        console.log(
+          `Message de ${sender_id} à ${receiver_id}: ${message} (${messagesSent} sockets notifiés, ${failedSockets.length} échecs)`
+        );
+
+        // Optionnel : stocker le message pour l'historique
+        messages.push(messageData);
+
+        // Limiter le stockage en mémoire
+        if (messages.length > 1000) {
+          messages = messages.slice(-500); // Garder les 500 derniers
+        }
+      } else {
+        console.log(
+          `Utilisateur ${receiver_id} non connecté. Utilisateurs disponibles:`,
+          Object.keys(users)
+        );
+        socket.emit("user_offline", {
+          receiver_id: receiver_id,
+          message: "Le destinataire n'est pas connecté",
+          available_users: Object.keys(users),
+          timestamp: new Date().toISOString(),
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'envoi du message:", error.message);
+      socket.emit("message_error", {
+        message: error.message,
         timestamp: new Date().toISOString(),
-        sockets_notified: messagesSent,
-      });
-
-      console.log(
-        `Message de ${sender_id} à ${receiver_id}: ${message} (${messagesSent} sockets notifiés)`
-      );
-    } else {
-      console.log(
-        `Utilisateur ${receiver_id} non connecté. Utilisateurs disponibles:`,
-        Object.keys(users)
-      );
-      socket.emit("user_offline", {
-        receiver_id: receiver_id,
-        message: "Le destinataire n'est pas connecté",
-        available_users: Object.keys(users),
       });
     }
   });
 
   // Gestion de la déconnexion
-  socket.on("disconnect", () => {
-    console.log(`Socket déconnecté : ${socket.id}`);
+  socket.on("disconnect", (reason) => {
+    console.log(`Socket déconnecté : ${socket.id}, raison: ${reason}`);
 
-    // Si l'user_id est associé au socket, nettoyer directement
+    // Nettoyer le timeout
+    clearTimeout(activityTimeout);
+
+    // Nettoyer les données utilisateur
     if (socket.user_id) {
       if (users[socket.user_id]) {
         users[socket.user_id] = users[socket.user_id].filter(
@@ -165,7 +335,67 @@ io.on("connection", (socket) => {
 
   // Événement pour obtenir la liste des utilisateurs connectés
   socket.on("get_online_users", () => {
-    socket.emit("online_users", Object.keys(users));
+    resetActivityTimeout();
+
+    try {
+      const onlineUsers = Object.keys(users);
+
+      console.log("=== UTILISATEURS EN LIGNE ===");
+
+      const userEntries = Object.entries(users);
+
+      if (userEntries.length === 0) {
+        console.log("Aucun utilisateur connecté");
+        return;
+      }
+
+      userEntries.forEach(([userId, socketIds]) => {
+        // Vérification supplémentaire pour identifier les objets
+        const userIdType = typeof userId;
+        const isValidString =
+          userIdType === "string" && userId !== "[object Object]";
+
+        if (!isValidString) {
+          console.log(`⚠️  PROBLÈME DÉTECTÉ - User ID invalide:`);
+          console.log(`   Type: ${userIdType}`);
+          console.log(`   Valeur: ${userId}`);
+          console.log(`   JSON: ${JSON.stringify(userId)}`);
+          console.log(`   Sockets: [${socketIds.join(", ")}]`);
+        } else {
+          console.log(
+            `✅ ${userId}: ${socketIds.length} connexion(s) - [${socketIds.join(
+              ", "
+            )}]`
+          );
+        }
+      });
+
+      socket.emit("online_users", {
+        users: onlineUsers,
+        count: onlineUsers.length,
+        timestamp: new Date().toISOString(),
+      });
+      console.log(
+        `Liste des utilisateurs en ligne envoyée à ${socket.id}:`,
+        onlineUsers
+      );
+    } catch (error) {
+      console.error("Erreur get_online_users:", error.message);
+      socket.emit("error", {
+        message: "Erreur lors de la récupération des utilisateurs",
+      });
+    }
+  });
+
+  // Événement pour ping/pong (maintenir la connexion active)
+  socket.on("ping", () => {
+    resetActivityTimeout();
+    socket.emit("pong", { timestamp: new Date().toISOString() });
+  });
+
+  // Gestion des erreurs générales
+  socket.on("error", (error) => {
+    console.error("Erreur socket:", error);
   });
 });
 
@@ -180,6 +410,24 @@ const getAdminIds = async () => {
 
     const admins = await response.json();
     return admins.map((admin) => admin.id); // Supposons que l'API retourne une liste d'admins { id: ... }
+  } catch (error) {
+    console.error("Erreur lors de la récupération des admins:", error);
+    return [];
+  }
+};
+
+const getUsersInline = async (token) => {
+  try {
+    const response = await fetch("https://backend.damam-group.com/api/users", {
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      method: "POST",
+    });
+
+    const users = await response.json();
+    return users.id; // Supposons que l'API retourne une liste d'admins { id: ... }
   } catch (error) {
     console.error("Erreur lors de la récupération des admins:", error);
     return [];
@@ -296,7 +544,6 @@ app.post(
 
     try {
       const adminIds = await getAdminIds();
-      console.log("Admin IDs:", adminIds);
 
       if (!adminIds || adminIds.length === 0) {
         return res
@@ -339,29 +586,60 @@ app.post(
         });
       }
 
-      console.log(`Message envoyé avec succès à l'API Laravel`);
+      $userInline = await getUsersInline(token);
 
-      // Envoyer le message via Socket.IO à tous les admins connectés
-      let adminNotified = 0;
-      adminIds.forEach((adminId) => {
-        if (users[adminId] && users[adminId].length > 0) {
-          users[adminId].forEach((socketId) => {
+      const isSenderAdmin = adminIds.includes($userInline);
+
+      console.log("user connectee:", $userInline);
+
+      if (isSenderAdmin === true) {
+        // L'admin envoie un message à l'utilisateur (receiver_id)
+
+        if (users[user_id] && users[user_id].length > 0) {
+          users[user_id].forEach((socketId) => {
             io.to(socketId).emit("receive_message", {
-              sender_id: user_id,
-              receiver_id: adminId,
+              sender_id: $userInline, // ID de l'admin qui envoie
+              receiver_id: user_id, // ID de l'utilisateur qui reçoit
               message: message,
-              piece_jointe: req.file ? req.file.originalname : null,
-              timestamp: new Date().toISOString(),
               is_support_message: true,
+              timestamp: new Date().toISOString(),
+              piece_jointe: req.file ? req.file.originalname : null,
             });
           });
-          adminNotified++;
         }
-      });
+
+        console.log(
+          `Message envoyé à l'utilisateur ${user_id} par l'admin ${$userInline}:`,
+          message
+        );
+      } else {
+        // L'utilisateur envoie un message à tous les admins connectés
+        let adminNotified = 0;
+
+        adminIds.forEach((adminId) => {
+          if (users[adminId] && users[adminId].length > 0) {
+            users[adminId].forEach((socketId) => {
+              io.to(socketId).emit("receive_message", {
+                sender_id: $userInline,
+                receiver_id: adminId,
+                message: message,
+                is_support_message: true,
+                timestamp: new Date().toISOString(),
+                piece_jointe: req.file ? req.file.originalname : null,
+              });
+            });
+            console.log(
+              `Message envoyé à l'admin ${user_id} par l'utilisateur ${$userInline} :`,
+              message
+            );
+            adminNotified++;
+          }
+        });
+      }
 
       res.status(200).json({
         message: "Messages envoyés aux administrateurs avec succès.",
-        admins_notified: adminNotified,
+        // admins_notified: adminNotified,
         total_admins: adminIds.length,
       });
     } catch (error) {
